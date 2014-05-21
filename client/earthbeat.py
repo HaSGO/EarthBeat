@@ -22,7 +22,7 @@ from pylab import *
 from mpl_toolkits.mplot3d import Axes3D
 import serial
 import numpy as np
-from time import sleep	
+from time import sleep
 from time import gmtime, strftime
 import math
 import argparse
@@ -34,7 +34,7 @@ class EarthbeatCom:
 	"""
 	Class to manage the communication with acquisition hardware (Arduino board).
 	"""
-	
+
 	def __init__(self, filename, baudrate):
 		"""
 		Open the serial port and set the baudrate.
@@ -46,13 +46,13 @@ class EarthbeatCom:
 		self.p.write('c') #set continuos read-mode
 		for i in range(6):
 			tmp = self.p.read()
-			if tmp != '\x00': 
+			if tmp != '\x00':
 				raise ValueError('Response is not 0')
 		self.p.write('r')
-		
+
 	def __del__(self):
 		self.p.close()
-		
+
 	def getSync(self):
 		"""
 		Recover the situation. If we have lost the sync with the hardware, throw the current message and resync on the next.
@@ -65,11 +65,11 @@ class EarthbeatCom:
 				if tmp1==0:
 					tmp2=ord(self.p.read())
 					start = tmp2 >> 3
-					if start == 0:  
+					if start == 0:
 						inizio=True
 						tmp=tmp2
-		return [True,tmp] 
-	
+		return [True,tmp]
+
 	def readSample(self, count = 0):
 		"""
 		Read a sample, made of three distinct numbers, one for each channel.
@@ -81,20 +81,20 @@ class EarthbeatCom:
 		#check if the first byte is zero, if not resync
 		if tmp != 0:
 			self.file1.write("First byte of the start sequence is not 0")
-			ret=self.getSync() 
+			ret=self.getSync()
 			inizio=ret[0]
 			tmp=ret[1]
-		
+
 		if not inizio:
 			tmp = ord(self.p.read())
 			#check if first 5 bits of the second byte are zeroes, if not resync
 			start = tmp >> 3
 			if start != 0:
 				self.file1.write("Last 5 bit of start sequence are not 0 - start=" + str(start) + " count=" + str(count) + " tmp=" + str(tmp)+"\n")
-				ret=self.getSync() 
+				ret=self.getSync()
 				inizio=ret[0]
 				tmp=ret[1]
-		
+
 		#unpack the three 10-digit numbers acquired and packed by arduino
 		check1=tmp
 		tmpx = tmp << 7
@@ -119,22 +119,22 @@ class EarthbeatCom:
 
 		tmpz = tmpz | tmp >> 5
 		tmp = tmp & 0b00011111
-		
+
 		#check the last five bits of the second to last byte, if not resync
 		if tmp != 0:
 			self.file1.write("First 5 bit of stop sequence are not 0 - count=" + str(count) + " tmp=" + str(tmp)+"\n")
-			ret=self.getSync() 
+			ret=self.getSync()
 			inizio=ret[0]
 			tmp=ret[1]
-			
-		inizio=False	
+
+		inizio=False
 		if not inizio:
 			tmp = ord(self.p.read())
 			check6=tmp
 			#check if the last byte is zero, if not resync
 			if tmp != 0:
 				self.file1.write("Last byte of stop sequence is not 0 - count=" + str(count) + " tmp=" + str(tmp)+"\n")
-				ret=self.getSync() 
+				ret=self.getSync()
 				inizio=ret[0]
 				tmp=ret[1]
 
@@ -191,14 +191,14 @@ arrayY=[0]*1200
 arrayZ=[0]*1200
 A_x=[0]*1200
 A_y=[0]*1200
-A_z=[0]*1200	
+A_z=[0]*1200
 dataMin=0
 dataMax=1024
 
 #setup plots
 f, ((ax1, ax2, ax3) , (ax4, ax5, ax6)) = plt.subplots(2, 3, sharex=False)
 r1=np.arange(0,1200,1)
-ylim([0,1024])	
+ylim([0,1024])
 ax1.set_title('Vx')
 ax2.set_title('Vy')
 ax3.set_title('Vz')
@@ -234,18 +234,18 @@ plt.pause(1)
 count = 1
 
 #check if we have to write data to file
-if writeDataEnable:	
+if writeDataEnable:
 	out_vel = openFiles(strftime("%Y-%m-%d_%H:%M:%S", gmtime()))
 
 
 #open Earthbeat Acquisition on ttyACM0
-reader = EarthbeatCom(sn_dev, sn_speed) 
+reader = EarthbeatCom(sn_dev, sn_speed)
 print("Start")
 
 #start the data acquisition loop
 while (1):
 	try:
-		smpl = reader.readSample(count) 
+		smpl = reader.readSample(count)
 		tmpx = smpl[0]
 		tmpy = smpl[1]
 		tmpz = smpl[2]
@@ -255,12 +255,12 @@ while (1):
 			del arrayY[0]
 			del arrayZ[0]
 		#add latest samples.
-		arrayX.append(tmpx)		
+		arrayX.append(tmpx)
 		arrayY.append(tmpy)
 		arrayZ.append(tmpz)
 		if writeDataEnable:
 			out_vel.write(str(tmpx)+"\t"+str(tmpy)+"\t"+str(tmpz)+"\n")
-		
+
 		if(len(arrayX)>=1200):
 			#every 100 samples update the graphs
 			if (count%100)==0:
@@ -268,22 +268,22 @@ while (1):
 				linex.set_ydata(arrayX)
 				liney.set_ydata(arrayY)
 				linez.set_ydata(arrayZ)
-				
+
 				plotFFT(linex_fft, arrayX)
 				plotFFT(liney_fft, arrayY)
 				plotFFT(linez_fft, arrayZ)
 
 				f.canvas.draw()
 				plt.pause(0.00000001)
-		if writeDataEnable:		
+		if writeDataEnable:
 			#every 60000 samples do an output file rotation.
 			if(count%60000==59999):
 				#file rotation
 				out_vel.close()
 				out_vel = openFiles(strftime("%Y-%m-%d_%H:%M:%S", gmtime()))
-			
+
 		count=count+1
-		
+
 	#catch CTRL+C
 	except KeyboardInterrupt:
 		print "\n...Bye"
