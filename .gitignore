@@ -1,0 +1,2 @@
+# Ignore ino build directory
+arduino/.build
